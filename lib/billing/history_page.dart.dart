@@ -8,15 +8,15 @@ import 'components/billings_tab.dart';
 import 'components/payments_tab.dart';
 import 'components/payment_details_modal.dart';
 
-class BillingHistoryPage extends StatefulWidget {
-  const BillingHistoryPage({super.key, required this.auth});
+class HistoryPage extends StatefulWidget {
+  const HistoryPage({super.key, required this.auth});
   final AuthService auth;
 
   @override
-  State<BillingHistoryPage> createState() => _BillingHistoryPageState();
+  State<HistoryPage> createState() => _HistoryPageState();
 }
 
-class _BillingHistoryPageState extends State<BillingHistoryPage> {
+class _HistoryPageState extends State<HistoryPage> {
   String tab = "bills"; // "bills" | "payments"
   late int year;
 

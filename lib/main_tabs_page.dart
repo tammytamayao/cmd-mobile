@@ -1,4 +1,4 @@
-import 'package:cmd_mobile/billing/billing_history_page.dart.dart';
+import 'package:cmd_mobile/billing/history_page.dart.dart';
 import 'package:flutter/material.dart';
 
 import 'dashboard/dashboard_page.dart';
@@ -38,7 +38,7 @@ class _MainTabsPageState extends State<MainTabsPage> {
   Widget build(BuildContext context) {
     final pages = <Widget>[
       DashboardPage(auth: widget.auth),
-      BillingHistoryPage(auth: widget.auth),
+      HistoryPage(auth: widget.auth),
       const SupportPage(),
     ];
 
