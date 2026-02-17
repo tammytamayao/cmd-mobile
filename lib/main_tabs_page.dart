@@ -19,7 +19,7 @@ class _MainTabsPageState extends State<MainTabsPage> {
   String _titleForIndex(int i) {
     switch (i) {
       case 1:
-        return "Bills & Payments";
+        return "History";
       case 2:
         return "Support";
       default:
@@ -93,7 +93,7 @@ class _MainTabsPageState extends State<MainTabsPage> {
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.receipt_long_outlined),
-            label: "Bills",
+            label: "History",
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.support_agent_outlined),

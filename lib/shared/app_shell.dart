@@ -115,13 +115,11 @@ class AppShell extends StatelessWidget {
               ),
               ListTile(
                 leading: const Icon(Icons.receipt_long_outlined),
-                title: const Text("Bills & Payments"),
+                title: const Text("History"),
                 onTap: () {
                   Navigator.pop(context);
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text("TODO: Bills & Payments page"),
-                    ),
+                    const SnackBar(content: Text("TODO: History page")),
                   );
                 },
               ),
