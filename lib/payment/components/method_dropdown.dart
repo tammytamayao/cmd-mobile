@@ -21,16 +21,26 @@ class MethodDropdown extends StatelessWidget {
     }
 
     return Container(
+      height: 44, // ✅ consistent touch target (matches your buttons vibe)
       padding: const EdgeInsets.symmetric(horizontal: 12),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: const Color(0xFFD1D5DB)),
       ),
+      alignment: Alignment.center,
       child: DropdownButtonHideUnderline(
         child: DropdownButton<String>(
           value: value,
           isExpanded: true,
+          icon: const Icon(Icons.keyboard_arrow_down, color: Color(0xFF6B7280)),
+          style: const TextStyle(
+            fontSize: 14,
+            color: Color(0xFF111827),
+            fontWeight: FontWeight.w600,
+          ),
+          dropdownColor: Colors.white,
+          borderRadius: BorderRadius.circular(12),
           items: options
               .map(
                 (v) =>

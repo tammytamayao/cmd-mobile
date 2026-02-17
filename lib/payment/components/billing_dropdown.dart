@@ -15,9 +15,23 @@ class BillingDropdown extends StatelessWidget {
   final int? value;
   final ValueChanged<int?> onChange;
 
+  bool _isUnpaid(Billing b) {
+    final s = b.status.toLowerCase().trim();
+    // adjust if your backend uses different status values
+    return s != "paid" && s != "completed";
+  }
+
+  DateTime _parseDate(String v) => DateTime.tryParse(v) ?? DateTime(1970);
+
   @override
   Widget build(BuildContext context) {
-    final List<Billing> items = openBillings.whereType<Billing>().toList();
+    final items = openBillings.where(_isUnpaid).toList()
+      ..sort((a, b) => _parseDate(b.dueDate).compareTo(_parseDate(a.dueDate)));
+
+    // ✅ prevent DropdownButton crash if selected value isn't in items
+    final safeValue = (value != null && items.any((b) => b.id == value))
+        ? value
+        : null;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -28,7 +42,7 @@ class BillingDropdown extends StatelessWidget {
       ),
       child: DropdownButtonHideUnderline(
         child: DropdownButton<int>(
-          value: value,
+          value: safeValue,
           isExpanded: true,
           hint: Text(
             items.isEmpty
