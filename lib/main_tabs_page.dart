@@ -1,7 +1,9 @@
 import 'package:cmd_mobile/billing/billing_history_page.dart.dart';
 import 'package:flutter/material.dart';
+
 import 'dashboard/dashboard_page.dart';
 import 'services/auth_service.dart';
+import 'support/support_page.dart'; // ✅ new file
 
 class MainTabsPage extends StatefulWidget {
   const MainTabsPage({super.key, required this.auth});
@@ -29,7 +31,6 @@ class _MainTabsPageState extends State<MainTabsPage> {
     await widget.auth.logout();
     if (!mounted) return;
 
-    // Go back to login (and clear history)
     Navigator.of(context).popUntil((r) => r.isFirst);
   }
 
@@ -45,17 +46,13 @@ class _MainTabsPageState extends State<MainTabsPage> {
       backgroundColor: const Color(0xFFF3F4F6), // gray-100
       appBar: AppBar(
         backgroundColor: Colors.white,
-        surfaceTintColor: Colors.white, // remove Material tint
+        surfaceTintColor: Colors.white,
         elevation: 0,
         titleSpacing: 0,
         title: Row(
           children: [
             const SizedBox(width: 12),
-            Image.asset(
-              "assets/logo.jpg",
-              height: 24, // smaller = cleaner alignment
-              fit: BoxFit.contain,
-            ),
+            Image.asset("assets/logo.jpg", height: 24, fit: BoxFit.contain),
             const SizedBox(width: 10),
             Text(
               _titleForIndex(index),
@@ -77,18 +74,15 @@ class _MainTabsPageState extends State<MainTabsPage> {
         ],
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(1),
-          child: Container(
-            height: 1,
-            color: const Color(0xFFE5E7EB), // divider like web header
-          ),
+          child: Container(height: 1, color: const Color(0xFFE5E7EB)),
         ),
       ),
       body: pages[index],
       bottomNavigationBar: BottomNavigationBar(
         type: BottomNavigationBarType.fixed,
-        backgroundColor: Colors.white, // match header
+        backgroundColor: Colors.white,
         elevation: 0,
-        selectedItemColor: const Color(0xFF2563EB), // blue-600
+        selectedItemColor: const Color(0xFF2563EB),
         unselectedItemColor: const Color(0xFF6B7280),
         currentIndex: index,
         onTap: (i) => setState(() => index = i),
@@ -108,14 +102,5 @@ class _MainTabsPageState extends State<MainTabsPage> {
         ],
       ),
     );
-  }
-}
-
-class SupportPage extends StatelessWidget {
-  const SupportPage({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return const Center(child: Text("Support (coming soon)"));
   }
 }
