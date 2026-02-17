@@ -33,7 +33,10 @@ class BillingDropdown extends StatelessWidget {
         ? value
         : null;
 
+    final hasItems = items.isNotEmpty;
+
     return Container(
+      height: 42, // ✅ match MethodDropdown feel
       padding: const EdgeInsets.symmetric(horizontal: 12),
       decoration: BoxDecoration(
         color: Colors.white,
@@ -44,21 +47,51 @@ class BillingDropdown extends StatelessWidget {
         child: DropdownButton<int>(
           value: safeValue,
           isExpanded: true,
+          icon: const Icon(
+            Icons.keyboard_arrow_down_rounded,
+            size: 20,
+            color: Color(0xFF6B7280),
+          ),
+          dropdownColor: Colors.white,
+          elevation: 2,
+          borderRadius: BorderRadius.circular(12),
           hint: Text(
-            items.isEmpty
-                ? "No open/overdue billings"
-                : "Select billing period",
-            style: const TextStyle(color: Color(0xFF6B7280)),
+            hasItems ? "Select billing period" : "No open/overdue billings",
+            style: const TextStyle(
+              color: Color(0xFF6B7280),
+              fontWeight: FontWeight.w600,
+            ),
+            overflow: TextOverflow.ellipsis,
+          ),
+          style: const TextStyle(
+            color: Color(0xFF111827),
+            fontWeight: FontWeight.w700,
+            fontSize: 14,
           ),
           items: items.map((b) {
             final label =
                 "${formatDate(b.startDate)} – ${formatDate(b.endDate)}";
+
             return DropdownMenuItem<int>(
               value: b.id,
-              child: Text(label, overflow: TextOverflow.ellipsis),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      label,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF111827),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                ],
+              ),
             );
           }).toList(),
-          onChanged: items.isEmpty ? null : onChange,
+          onChanged: hasItems ? onChange : null,
         ),
       ),
     );
