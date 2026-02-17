@@ -1,3 +1,4 @@
+import 'package:cmd_mobile/payment/payment_page.dart';
 import 'package:flutter/material.dart';
 import '../models/subscriber_me.dart';
 import '../services/auth_service.dart';
@@ -76,9 +77,9 @@ class _DashboardPageState extends State<DashboardPage> {
           dueOn: u.dueOn,
           billingStatus: u.latestBilling?.status,
           onMakePayment: () {
-            ScaffoldMessenger.of(
-              context,
-            ).showSnackBar(const SnackBar(content: Text("TODO: Payment page")));
+            Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => PaymentPage(auth: widget.auth)),
+            );
           },
         ),
         const SizedBox(height: 16),

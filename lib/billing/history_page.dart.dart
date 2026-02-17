@@ -106,12 +106,6 @@ class _HistoryPageState extends State<HistoryPage> {
     }
   }
 
-  void _makePayment() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text("TODO: Navigate to payment page")),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     Widget container(Widget child) {
@@ -123,7 +117,7 @@ class _HistoryPageState extends State<HistoryPage> {
           border: Border.all(color: const Color(0xFFE5E7EB)),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.04),
+              color: Colors.black.withValues(alpha: 0.04),
               blurRadius: 10,
               offset: const Offset(0, 6),
             ),
