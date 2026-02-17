@@ -1,4 +1,4 @@
-import 'package:cmd_mobile/dashboard/dashboard_page.dart';
+import 'package:cmd_mobile/main_tabs_page.dart';
 import 'package:flutter/material.dart';
 import 'components/identity_field.dart';
 import 'components/password_field.dart';
@@ -72,7 +72,7 @@ class _LoginPageState extends State<LoginPage> {
       );
 
       // Optional (useful for first-time testing): verify token works
-      await _auth.me();
+      // await _auth.me();
 
       if (!mounted) return;
 
@@ -82,7 +82,7 @@ class _LoginPageState extends State<LoginPage> {
 
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (_) => const DashboardPage()),
+        MaterialPageRoute(builder: (_) => MainTabsPage(auth: _auth)),
       );
     } on ApiException catch (e) {
       setState(() => err = e.message);
