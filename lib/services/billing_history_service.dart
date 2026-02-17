@@ -42,3 +42,46 @@ class BillingHistoryService {
     return [];
   }
 }
+
+class YearRange {
+  final int? minYear;
+  final int? maxYear;
+  const YearRange({this.minYear, this.maxYear});
+}
+
+extension BillingHistoryServiceYears on BillingHistoryService {
+  Future<YearRange> fetchBillingsYearRange() async {
+    // Mirror web: fetch tiny page so meta is included
+    final res = await api.getJson(
+      "/api/v1/billings?page=1&per_page=1",
+      auth: true,
+    );
+
+    final meta = res["meta"];
+    if (meta is Map) {
+      final m = meta.cast<String, dynamic>();
+      return YearRange(
+        minYear: (m["min_year"] as num?)?.toInt(),
+        maxYear: (m["max_year"] as num?)?.toInt(),
+      );
+    }
+    return const YearRange();
+  }
+
+  Future<YearRange> fetchPaymentsYearRange() async {
+    final res = await api.getJson(
+      "/api/v1/payments?page=1&per_page=1",
+      auth: true,
+    );
+
+    final meta = res["meta"];
+    if (meta is Map) {
+      final m = meta.cast<String, dynamic>();
+      return YearRange(
+        minYear: (m["min_year"] as num?)?.toInt(),
+        maxYear: (m["max_year"] as num?)?.toInt(),
+      );
+    }
+    return const YearRange();
+  }
+}

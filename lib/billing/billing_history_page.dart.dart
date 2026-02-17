@@ -32,14 +32,61 @@ class _BillingHistoryPageState extends State<BillingHistoryPage> {
   @override
   void initState() {
     super.initState();
-    year = DateTime.now().year;
-    yearOptions = List.generate(6, (i) => DateTime.now().year - i);
+
+    final nowY = DateTime.now().year;
+    year = nowY;
+    yearOptions = [nowY];
 
     final ApiClient api = widget.auth.api;
     service = BillingHistoryService(api: api);
 
-    _load();
+    _init();
   }
+
+  Future<void> _init() async {
+    await _loadYears();
+    await _load();
+  }
+
+  Future<void> _loadYears() async {
+    final nowY = DateTime.now().year;
+
+    try {
+      // Requires: service.fetchBillingsYearRange() and service.fetchPaymentsYearRange()
+      final results = await Future.wait([
+        service.fetchBillingsYearRange(),
+        service.fetchPaymentsYearRange(),
+      ]);
+
+      final bill = results[0];
+      final pay = results[1];
+
+      final minY = _minInt(bill.minYear ?? nowY, pay.minYear ?? nowY);
+      final maxY = _maxInt(bill.maxYear ?? nowY, pay.maxYear ?? nowY);
+
+      final years = (maxY >= minY)
+          ? List.generate(maxY - minY + 1, (i) => maxY - i)
+          : [nowY];
+
+      if (!mounted) return;
+
+      setState(() {
+        yearOptions = years;
+        // clamp selected year into available range
+        if (year < minY || year > maxY) year = maxY;
+      });
+    } catch (_) {
+      // fallback: current year only
+      if (!mounted) return;
+      setState(() {
+        yearOptions = [nowY];
+        year = nowY;
+      });
+    }
+  }
+
+  int _minInt(int a, int b) => a < b ? a : b;
+  int _maxInt(int a, int b) => a > b ? a : b;
 
   Future<void> _load() async {
     setState(() {
@@ -49,8 +96,10 @@ class _BillingHistoryPageState extends State<BillingHistoryPage> {
 
     try {
       final res = await service.fetch(year: year);
+      if (!mounted) return;
       setState(() => data = res);
     } catch (e) {
+      if (!mounted) return;
       setState(() => error = e.toString());
     } finally {
       if (mounted) setState(() => loading = false);
@@ -91,7 +140,6 @@ class _BillingHistoryPageState extends State<BillingHistoryPage> {
         padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
         children: [
           const SizedBox(height: 8),
-
           Row(
             children: [
               Segmented(
@@ -100,9 +148,7 @@ class _BillingHistoryPageState extends State<BillingHistoryPage> {
                   (label: "Payments", value: "payments"),
                 ],
                 value: tab,
-                onChange: (v) {
-                  setState(() => tab = v);
-                },
+                onChange: (v) => setState(() => tab = v),
               ),
               const Spacer(),
               YearDropdown(
@@ -115,7 +161,6 @@ class _BillingHistoryPageState extends State<BillingHistoryPage> {
               ),
             ],
           ),
-
           container(
             loading
                 ? const Padding(
@@ -141,7 +186,7 @@ class _BillingHistoryPageState extends State<BillingHistoryPage> {
                 ? BillingsTab(bills: data?.billings ?? [])
                 : PaymentsTab(
                     payments: data?.payments ?? [],
-                    // ✅ updated: open modal by paymentId + auth (fetch signed receipt_url)
+                    // ✅ open modal by paymentId + auth (fetch signed receipt_url)
                     onViewPayment: (paymentId) => PaymentDetailsModal.show(
                       context,
                       paymentId: paymentId,
