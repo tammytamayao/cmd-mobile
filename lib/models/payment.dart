@@ -1,3 +1,33 @@
+class PaymentReceiptMeta {
+  final String? filename;
+  final int? size;
+  final String? mimeType;
+  final String? uploadedAt;
+
+  PaymentReceiptMeta({
+    this.filename,
+    this.size,
+    this.mimeType,
+    this.uploadedAt,
+  });
+
+  factory PaymentReceiptMeta.fromJson(Map<String, dynamic> j) {
+    int? toInt(dynamic v) {
+      if (v == null) return null;
+      if (v is int) return v;
+      if (v is num) return v.toInt();
+      return int.tryParse(v.toString());
+    }
+
+    return PaymentReceiptMeta(
+      filename: j["filename"]?.toString(),
+      size: toInt(j["size"]),
+      mimeType: j["mime_type"]?.toString(),
+      uploadedAt: j["uploaded_at"]?.toString(),
+    );
+  }
+}
+
 class Payment {
   final int id;
   final String status;
@@ -6,11 +36,17 @@ class Payment {
   final String? paymentMethod;
   final String? referenceNumber;
 
-  // Optional details (for modal)
   final String? invoiceNumber;
+
+  // returned by show endpoint (signed)
   final String? receiptUrl;
+
+  // billing period
   final String? billingPeriodStart;
   final String? billingPeriodEnd;
+
+  // ✅ receipt meta
+  final PaymentReceiptMeta? receipt;
 
   Payment({
     required this.id,
@@ -23,6 +59,7 @@ class Payment {
     this.receiptUrl,
     this.billingPeriodStart,
     this.billingPeriodEnd,
+    this.receipt,
   });
 
   factory Payment.fromJson(Map<String, dynamic> j) {
@@ -38,6 +75,7 @@ class Payment {
       return int.tryParse(v.toString()) ?? 0;
     }
 
+    final receiptJson = j["receipt"];
     return Payment(
       id: toInt(j["id"]),
       status: (j["status"] ?? "").toString(),
@@ -49,6 +87,9 @@ class Payment {
       receiptUrl: j["receipt_url"]?.toString(),
       billingPeriodStart: j["billing_period_start"]?.toString(),
       billingPeriodEnd: j["billing_period_end"]?.toString(),
+      receipt: receiptJson is Map<String, dynamic>
+          ? PaymentReceiptMeta.fromJson(receiptJson)
+          : null,
     );
   }
 }

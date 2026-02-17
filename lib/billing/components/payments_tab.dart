@@ -12,7 +12,9 @@ class PaymentsTab extends StatelessWidget {
   });
 
   final List<Payment> payments;
-  final void Function(Payment p) onViewPayment;
+
+  // ✅ changed: pass paymentId (so modal can fetch full details + signed receipt_url)
+  final void Function(int paymentId) onViewPayment;
 
   @override
   Widget build(BuildContext context) {
@@ -60,7 +62,7 @@ class PaymentsTab extends StatelessWidget {
 
                 const SizedBox(height: 8),
 
-                // Row 2: amount + button (same row, compact)
+                // Row 2: amount + button
                 Row(
                   children: [
                     Expanded(
@@ -69,7 +71,7 @@ class PaymentsTab extends StatelessWidget {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
-                          fontSize: 18, // ✅ not too huge
+                          fontSize: 18,
                           fontWeight: FontWeight.w800,
                           color: Color(0xFF111827),
                         ),
@@ -77,7 +79,7 @@ class PaymentsTab extends StatelessWidget {
                     ),
                     const SizedBox(width: 10),
                     _CompactOutlineButton(
-                      onPressed: () => onViewPayment(p),
+                      onPressed: () => onViewPayment(p.id), // ✅ changed
                       text: "View details",
                     ),
                   ],
@@ -85,7 +87,7 @@ class PaymentsTab extends StatelessWidget {
 
                 const SizedBox(height: 6),
 
-                // Row 3: meta (small)
+                // Row 3: meta
                 Text(
                   "$method • $ref",
                   maxLines: 1,
@@ -129,7 +131,7 @@ class _CompactOutlineButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: 32, // ✅ compact button height
+      height: 32,
       child: OutlinedButton(
         onPressed: onPressed,
         style: OutlinedButton.styleFrom(

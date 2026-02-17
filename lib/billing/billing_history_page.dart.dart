@@ -58,8 +58,6 @@ class _BillingHistoryPageState extends State<BillingHistoryPage> {
   }
 
   void _makePayment() {
-    // Mirror web: router.push("/payment?subscriber=ID")
-    // We’ll wire this once your payment page exists.
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text("TODO: Navigate to payment page")),
     );
@@ -67,13 +65,12 @@ class _BillingHistoryPageState extends State<BillingHistoryPage> {
 
   @override
   Widget build(BuildContext context) {
-    // This is the white rounded container (like the web table wrapper)
     Widget container(Widget child) {
       return Container(
         margin: const EdgeInsets.only(top: 16),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(18), // rounded-2xl
+          borderRadius: BorderRadius.circular(18),
           border: Border.all(color: const Color(0xFFE5E7EB)),
           boxShadow: [
             BoxShadow(
@@ -95,7 +92,6 @@ class _BillingHistoryPageState extends State<BillingHistoryPage> {
         children: [
           const SizedBox(height: 8),
 
-          // Segmented + Year dropdown row (web)
           Row(
             children: [
               Segmented(
@@ -120,7 +116,6 @@ class _BillingHistoryPageState extends State<BillingHistoryPage> {
             ],
           ),
 
-          // Main white container (loading/error/tab content)
           container(
             loading
                 ? const Padding(
@@ -146,7 +141,12 @@ class _BillingHistoryPageState extends State<BillingHistoryPage> {
                 ? BillingsTab(bills: data?.billings ?? [])
                 : PaymentsTab(
                     payments: data?.payments ?? [],
-                    onViewPayment: (p) => PaymentDetailsModal.show(context, p),
+                    // ✅ updated: open modal by paymentId + auth (fetch signed receipt_url)
+                    onViewPayment: (paymentId) => PaymentDetailsModal.show(
+                      context,
+                      paymentId: paymentId,
+                      auth: widget.auth,
+                    ),
                   ),
           ),
         ],
