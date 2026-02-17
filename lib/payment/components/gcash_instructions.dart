@@ -54,10 +54,6 @@ class GcashInstructions extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          "Use the steps below to pay your bill in the GCash app. Then upload a screenshot of the successful transaction.",
-          style: TextStyle(color: Color(0xFF6B7280), height: 1.35),
-        ),
         const SizedBox(height: 12),
         step(1, "Login to your GCash account."),
         const SizedBox(height: 10),
