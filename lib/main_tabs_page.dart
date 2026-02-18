@@ -1,4 +1,5 @@
 import 'package:cmd_mobile/billing/history_page.dart.dart';
+import 'package:cmd_mobile/login/login_page.dart';
 import 'package:flutter/material.dart';
 
 import 'dashboard/dashboard_page.dart';
@@ -31,7 +32,10 @@ class _MainTabsPageState extends State<MainTabsPage> {
     await widget.auth.logout();
     if (!mounted) return;
 
-    Navigator.of(context).popUntil((r) => r.isFirst);
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => const LoginPage()),
+      (route) => false,
+    );
   }
 
   @override
@@ -43,27 +47,32 @@ class _MainTabsPageState extends State<MainTabsPage> {
     ];
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF3F4F6), // gray-100
+      backgroundColor: const Color(0xFFF3F4F6),
       appBar: AppBar(
         backgroundColor: Colors.white,
         surfaceTintColor: Colors.white,
         elevation: 0,
-        titleSpacing: 0,
-        title: Row(
-          children: [
-            const SizedBox(width: 12),
-            Image.asset("assets/logo.jpg", height: 24, fit: BoxFit.contain),
-            const SizedBox(width: 10),
-            Text(
-              _titleForIndex(index),
-              style: const TextStyle(
-                color: Color(0xFF111827),
-                fontSize: 18,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ],
+        centerTitle: true, // ✅ center the title
+        // logo on the left
+        leadingWidth: 56,
+        leading: Padding(
+          padding: const EdgeInsets.only(left: 12),
+          child: Image.asset(
+            "assets/logo.jpg",
+            height: 24,
+            fit: BoxFit.contain,
+          ),
         ),
+
+        title: Text(
+          _titleForIndex(index),
+          style: const TextStyle(
+            color: Color(0xFF2563EB), // ✅ same blue as selected tab
+            fontSize: 18,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+
         actions: [
           IconButton(
             tooltip: "Logout",
@@ -72,11 +81,13 @@ class _MainTabsPageState extends State<MainTabsPage> {
           ),
           const SizedBox(width: 8),
         ],
+
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(1),
           child: Container(height: 1, color: const Color(0xFFE5E7EB)),
         ),
       ),
+
       body: pages[index],
       bottomNavigationBar: BottomNavigationBar(
         type: BottomNavigationBarType.fixed,
