@@ -1,11 +1,15 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:cmd_mobile/config/env.dart';
+import 'package:cmd_mobile/models/payment.dart';
 import 'package:http/http.dart' as http;
 
-import '../config/env.dart';
-import '../models/payment.dart';
 import 'api_client.dart';
+
+import 'package:http_parser/http_parser.dart';
+import 'package:mime/mime.dart';
+import 'package:path/path.dart' as p;
 
 class PaymentService {
   final ApiClient api;
@@ -88,10 +92,22 @@ class PaymentService {
 
     // Optional receipt upload
     if (receiptFile != null) {
+      final filename = p.basename(receiptFile.path);
+
+      final mimeType =
+          lookupMimeType(receiptFile.path) ?? "application/octet-stream";
+      final parts = mimeType.split("/");
+      final mediaType = (parts.length == 2)
+          ? MediaType(parts[0], parts[1])
+          : MediaType("application", "octet-stream");
+
       final filePart = await http.MultipartFile.fromPath(
         "receipt",
         receiptFile.path,
+        filename: filename,
+        contentType: mediaType,
       );
+
       req.files.add(filePart);
     }
 
