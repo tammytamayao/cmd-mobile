@@ -1,4 +1,4 @@
-package com.example.cmd_mobile
+package dev.dcruz.cmd_mobile
 
 import io.flutter.embedding.android.FlutterActivity
 
