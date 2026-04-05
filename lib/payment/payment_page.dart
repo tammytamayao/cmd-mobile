@@ -1,18 +1,25 @@
 import 'dart:io';
 
 import 'package:cmd_mobile/models/billing.dart';
+import 'package:cmd_mobile/models/checkout.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
+import '../config/env.dart';
 import '../dashboard/formatters.dart';
 import '../models/subscriber_me.dart';
 import '../services/auth_service.dart';
 import '../services/api_client.dart';
+import '../services/checkout_service.dart';
 import '../services/payment_service.dart';
 
 import 'components/payment_form_card.dart';
 import 'components/payment_instructions_card.dart';
 import 'components/payment_confirm_card.dart';
+import 'components/payment_mode_toggle.dart';
+import 'components/online_method_selector.dart';
+import 'components/payment_status_card.dart';
 
 class PaymentPage extends StatefulWidget {
   const PaymentPage({super.key, required this.auth});
@@ -22,7 +29,7 @@ class PaymentPage extends StatefulWidget {
   State<PaymentPage> createState() => _PaymentPageState();
 }
 
-class _PaymentPageState extends State<PaymentPage> {
+class _PaymentPageState extends State<PaymentPage> with WidgetsBindingObserver {
   SubscriberMe? me;
   List<Billing> openBillings = [];
 
@@ -39,6 +46,23 @@ class _PaymentPageState extends State<PaymentPage> {
   String? submitError;
 
   late final PaymentService paymentService;
+  late final CheckoutService checkoutService;
+
+  // Payment mode: "manual" (receipt upload) or "online" (gateway)
+  String paymentMode = "online";
+
+  // Online payment state
+  OnlinePaymentMethod onlineMethod = OnlinePaymentMethod.gcash;
+  bool creatingCheckout = false;
+  String? checkoutError;
+  CheckoutResponse? checkout;
+
+  // Verification state
+  bool verifying = false;
+  CheckoutVerifyResponse? verifyResult;
+  int _pollCount = 0;
+  static const _maxPolls = 5;
+  static const _pollIntervalMs = 3000;
 
   // Same constants as web
   static const String gcashBillerName = "CMD Cable Vision Inc";
@@ -50,7 +74,27 @@ class _PaymentPageState extends State<PaymentPage> {
   void initState() {
     super.initState();
     paymentService = PaymentService(api: widget.auth.api);
+    checkoutService = CheckoutService(api: widget.auth.api);
+    WidgetsBinding.instance.addObserver(this);
     _load();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // When user returns to app after completing payment in browser/GCash app,
+    // automatically start verification
+    if (state == AppLifecycleState.resumed &&
+        checkout != null &&
+        !verifying &&
+        verifyResult == null) {
+      _startVerification();
+    }
   }
 
   Future<void> _load() async {
@@ -214,8 +258,122 @@ class _PaymentPageState extends State<PaymentPage> {
     }
   }
 
+  /// Create checkout session and open payment gateway in browser
+  Future<void> _createAndOpenCheckout() async {
+    if (billingId == null) {
+      setState(() => checkoutError = "Please select a billing period to pay.");
+      return;
+    }
+
+    setState(() {
+      creatingCheckout = true;
+      checkoutError = null;
+    });
+
+    try {
+      final result = await checkoutService.createCheckout(
+        billingId: billingId!,
+        paymentMethod: onlineMethod,
+        successUrl: "${Env.webBaseUrl}/payment/success",
+        cancelUrl: "${Env.webBaseUrl}/payment",
+      );
+
+      setState(() => checkout = result);
+
+      // Open checkout URL in external browser
+      final uri = Uri.parse(result.checkoutUrl);
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      } else {
+        throw Exception("Could not open payment page");
+      }
+    } on ApiException catch (e) {
+      setState(() => checkoutError = e.message);
+    } catch (e) {
+      setState(() => checkoutError = e.toString());
+    } finally {
+      if (mounted) setState(() => creatingCheckout = false);
+    }
+  }
+
+  /// Start polling verification endpoint
+  Future<void> _startVerification() async {
+    if (checkout == null) return;
+
+    setState(() {
+      verifying = true;
+      _pollCount = 0;
+      verifyResult = null;
+    });
+
+    await _pollVerification();
+  }
+
+  /// Poll verification endpoint with retry logic
+  Future<void> _pollVerification() async {
+    while (_pollCount < _maxPolls && mounted) {
+      try {
+        final result = await checkoutService.verifyCheckout(checkout!.checkoutId);
+
+        if (!mounted) return;
+
+        if (result.status == CheckoutStatus.completed ||
+            result.status == CheckoutStatus.failed) {
+          setState(() {
+            verifyResult = result;
+            verifying = false;
+          });
+          return;
+        }
+
+        // Still processing, continue polling
+        _pollCount++;
+        if (_pollCount < _maxPolls) {
+          await Future.delayed(
+            const Duration(milliseconds: _pollIntervalMs),
+          );
+        }
+      } catch (e) {
+        // Network error, continue polling
+        _pollCount++;
+        if (_pollCount < _maxPolls) {
+          await Future.delayed(
+            const Duration(milliseconds: _pollIntervalMs),
+          );
+        }
+      }
+    }
+
+    // Max polls reached, show processing state
+    if (mounted) {
+      setState(() {
+        verifying = false;
+        verifyResult = CheckoutVerifyResponse(
+          paymentId: checkout!.paymentId,
+          status: CheckoutStatus.processing,
+          gatewayStatus: "pending",
+          provider: checkout!.provider,
+        );
+      });
+    }
+  }
+
+  /// Reset checkout state to allow retrying
+  void _resetCheckout() {
+    setState(() {
+      checkout = null;
+      verifyResult = null;
+      checkoutError = null;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
+    // If we're in verification flow, show status view
+    if (checkout != null && (verifying || verifyResult != null)) {
+      return _buildStatusView();
+    }
+
     final selected = selectedBilling;
     final selectedAmount = (selected?.amount ?? me?.brate ?? 0);
 
@@ -254,46 +412,302 @@ class _PaymentPageState extends State<PaymentPage> {
               children: [
                 const SizedBox(height: 2),
 
-                PaymentFormCard(
-                  fullName: me?.fullName ?? "Customer",
-                  planName: "${me?.packageName ?? "-"}${me?.plan ?? ""}",
-                  totalAmount: selectedAmount,
-                  openBillings: openBillings,
-                  billingId: billingId,
-                  onBillingChange: (v) => setState(() => billingId = v),
-                  paymentMethod: paymentMethod,
-                  onPaymentMethodChange: (v) {
-                    setState(() {
-                      paymentMethod = v;
-                      if (!receiptRequired) receiptError = null;
-                    });
-                  },
+                // Mode toggle: Manual vs Online
+                PaymentModeToggle(
+                  mode: paymentMode,
+                  onModeChange: (v) => setState(() => paymentMode = v),
                 ),
 
                 const SizedBox(height: 14),
 
-                PaymentInstructionsCard(
-                  paymentMethod: paymentMethod,
-                  amount: selectedAmount,
-                  reference: me?.serialNumber ?? "-",
-                  selectedPeriodLabel: selectedPeriodLabel,
-                ),
+                // Show different content based on mode
+                if (paymentMode == "manual") ...[
+                  // Manual payment flow (receipt upload)
+                  PaymentFormCard(
+                    fullName: me?.fullName ?? "Customer",
+                    planName: "${me?.packageName ?? "-"}${me?.plan ?? ""}",
+                    totalAmount: selectedAmount,
+                    openBillings: openBillings,
+                    billingId: billingId,
+                    onBillingChange: (v) => setState(() => billingId = v),
+                    paymentMethod: paymentMethod,
+                    onPaymentMethodChange: (v) {
+                      setState(() {
+                        paymentMethod = v;
+                        if (!receiptRequired) receiptError = null;
+                      });
+                    },
+                  ),
 
-                const SizedBox(height: 14),
+                  const SizedBox(height: 14),
 
-                PaymentConfirmCard(
-                  receiptRequired: receiptRequired,
-                  receiptFile: receiptFile,
-                  receiptError: receiptError,
-                  onPickReceipt: _pickReceipt,
-                  onRemoveReceipt: _removeReceipt,
-                  submitError: submitError,
-                  submitting: submitting,
-                  submitDisabled: submitDisabled,
-                  onSubmit: _submit,
-                ),
+                  PaymentInstructionsCard(
+                    paymentMethod: paymentMethod,
+                    amount: selectedAmount,
+                    reference: me?.serialNumber ?? "-",
+                    selectedPeriodLabel: selectedPeriodLabel,
+                  ),
+
+                  const SizedBox(height: 14),
+
+                  PaymentConfirmCard(
+                    receiptRequired: receiptRequired,
+                    receiptFile: receiptFile,
+                    receiptError: receiptError,
+                    onPickReceipt: _pickReceipt,
+                    onRemoveReceipt: _removeReceipt,
+                    submitError: submitError,
+                    submitting: submitting,
+                    submitDisabled: submitDisabled,
+                    onSubmit: _submit,
+                  ),
+                ] else ...[
+                  // Online payment flow (gateway checkout)
+                  _buildOnlinePaymentForm(selectedAmount),
+                ],
               ],
             ),
+    );
+  }
+
+  /// Build the online payment form
+  Widget _buildOnlinePaymentForm(num amount) {
+    return Column(
+      children: [
+        // Subscriber info card (reuse styling)
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: const Color(0xFFE5E7EB)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          "Full Name",
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Color(0xFF6B7280),
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          me?.fullName ?? "Customer",
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF111827),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          "Plan",
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Color(0xFF6B7280),
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          "${me?.packageName ?? "-"}${me?.plan ?? ""}",
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF111827),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              const Divider(height: 1, color: Color(0xFFE5E7EB)),
+              const SizedBox(height: 12),
+              const Text(
+                "Billing Period",
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Color(0xFF6B7280),
+                ),
+              ),
+              const SizedBox(height: 6),
+              _buildBillingDropdown(),
+            ],
+          ),
+        ),
+
+        const SizedBox(height: 14),
+
+        // Payment method selector
+        OnlineMethodSelector(
+          selectedMethod: onlineMethod,
+          onMethodChange: (v) => setState(() => onlineMethod = v),
+        ),
+
+        const SizedBox(height: 14),
+
+        // Amount and Pay Now button
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: const Color(0xFFE5E7EB)),
+          ),
+          child: Column(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF3F4F6),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      "Total Amount",
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                        color: Color(0xFF6B7280),
+                      ),
+                    ),
+                    Text(
+                      formatCurrency(amount),
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF111827),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              if (checkoutError != null) ...[
+                const SizedBox(height: 12),
+                Text(
+                  checkoutError!,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    color: Color(0xFFDC2626),
+                  ),
+                ),
+              ],
+
+              const SizedBox(height: 16),
+
+              SizedBox(
+                width: double.infinity,
+                height: 48,
+                child: ElevatedButton(
+                  onPressed: (creatingCheckout || billingId == null)
+                      ? null
+                      : _createAndOpenCheckout,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF2563EB),
+                    foregroundColor: Colors.white,
+                    disabledBackgroundColor: const Color(0xFF93C5FD),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                  child: Text(
+                    creatingCheckout ? "Redirecting..." : "Pay Now",
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// Build billing period dropdown for online payment
+  Widget _buildBillingDropdown() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      decoration: BoxDecoration(
+        border: Border.all(color: const Color(0xFFE5E7EB)),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<int>(
+          value: billingId,
+          isExpanded: true,
+          hint: const Text("Select billing period"),
+          items: openBillings.map((b) {
+            final label = (b.startDate.isNotEmpty && b.endDate.isNotEmpty)
+                ? "${formatDate(b.startDate)} – ${formatDate(b.endDate)}"
+                : "Billing #${b.id}";
+            return DropdownMenuItem(
+              value: b.id,
+              child: Text(label),
+            );
+          }).toList(),
+          onChanged: (v) => setState(() => billingId = v),
+        ),
+      ),
+    );
+  }
+
+  /// Build the verification status view
+  Widget _buildStatusView() {
+    return Scaffold(
+      backgroundColor: const Color(0xFFF3F4F6),
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.white,
+        elevation: 0,
+        title: const Text(
+          "Payment Status",
+          style: TextStyle(
+            color: Color(0xFF111827),
+            fontSize: 18,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+        leading: IconButton(
+          icon: const Icon(Icons.close, color: Color(0xFF111827)),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(1),
+          child: Container(height: 1, color: const Color(0xFFE5E7EB)),
+        ),
+      ),
+      body: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: PaymentStatusCard(
+            status: verifyResult?.status,
+            verifying: verifying,
+            onRetry: _resetCheckout,
+            onDone: () => Navigator.of(context).pop(),
+          ),
+        ),
+      ),
     );
   }
 }
